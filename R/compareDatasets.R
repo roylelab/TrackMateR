@@ -67,7 +67,7 @@ compareDatasets <- function(...) {
       fileName <- allTrackMateFiles[j]
       thisFilePath <- paste0(condFolderPath, "/", fileName)
       # read dataset
-      tmObj <- readTrackMateXML(XMLpath = thisFilePath)
+      tmObj <- readTrackMateXML(XMLpath = thisFilePath, slim = TRUE)
       if(is.null(tmObj)) {
         cat(paste0("Skipping ",fileName," - no data found!\n"))
         next

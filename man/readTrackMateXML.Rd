@@ -4,10 +4,12 @@
 \alias{readTrackMateXML}
 \title{Read TrackMate XML output files.}
 \usage{
-readTrackMateXML(XMLpath)
+readTrackMateXML(XMLpath, slim = FALSE)
 }
 \arguments{
 \item{XMLpath}{path to the xml file}
+
+\item{slim}{if TRUE, only the minimum data required to process the tracks is returned}
 }
 \value{
 list of two data frames

@@ -4,6 +4,7 @@
 #' A warning is generated if the scaling is in pixels rather than real units.
 #'
 #' @param XMLpath path to the xml file
+#' @param slim if TRUE, only the minimum data required to process the tracks is returned
 #' @return list of two data frames
 #' @examples
 #' xmlPath <- system.file("extdata", "ExampleTrackMateData.xml", package="TrackMateR")
@@ -14,7 +15,7 @@
 #' calibrationDF <- tmObj[[2]]
 #' @export
 
-readTrackMateXML<- function(XMLpath){
+readTrackMateXML<- function(XMLpath, slim = FALSE){
 
   # get necessary XMLNodeSet
   e <- xmlParse(XMLpath)
@@ -48,6 +49,15 @@ readTrackMateXML<- function(XMLpath){
   targetVec <-  xpathSApply(e, "//DetectorSettings", xmlGetAttr, "TARGET_CHANNEL")
   calibrationDF[7,1] <- as.numeric(targetVec)
   calibrationDF[7,2] <- "channel"
+
+  # if we are doing slim processing, we only get the minimum data required to process the tracks
+  if(slim) {
+    # we only need a subset of possible attributes
+    slimAttr <- c("name", "POSITION_X", "POSITION_Y", "POSITION_Z",
+                  "POSITION_T", "FRAME", "MEAN_INTENSITY",
+                  paste0("MEAN_INTENSITY_CH",targetVec))
+    attrName <- attrName[attrName %in% slimAttr]
+  }
 
   # multicore processing
   numCores <- parallelly::availableCores()
