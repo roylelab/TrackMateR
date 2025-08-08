@@ -16,7 +16,11 @@
 #' @export
 
 readTrackMateXML<- function(XMLpath, slim = FALSE){
-
+  # check if XML file exists
+  if(!file.exists(XMLpath)) {
+    cat("XML file does not exist: ", XMLpath, "\n")
+    return(NULL)
+  }
   # get necessary XMLNodeSet
   e <- xmlParse(XMLpath)
   track <- getNodeSet(e, "//Track")
@@ -91,10 +95,13 @@ readTrackMateXML<- function(XMLpath, slim = FALSE){
   }
   # more R-like headers
   headerNames <- tolower(attrName)
-  # remove _CH1 or whatever from headers
-  # headerNames <- gsub("\\wCH\\d$","",headerNames,ignore.case = T)
+  # in the case of slim = TRUE, we rename the MEAN_INTENSITY_CHX column to
+  # remove _CH1 or whatever from any header
+  if(slim) {
+    headerNames <- gsub("_ch\\d$","",headerNames,ignore.case = TRUE)
+  }
   # change x y z t
-  headerNames <- gsub("^position\\w","",headerNames,ignore.case = T)
+  headerNames <- gsub("^position\\w","",headerNames,ignore.case = TRUE)
   names(dtf) <- headerNames
 
   cat("Matching track data...\n")
@@ -112,6 +119,13 @@ readTrackMateXML<- function(XMLpath, slim = FALSE){
     targetVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPOT_TARGET_ID"))
     dispVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "DISPLACEMENT"))
     speedVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPEED"))
+    # if the user has not added Analyzers, displacement and speed will be NULL
+    if(is.null(dispVec)) {
+      dispVec <- rep(0, length(targetVec))
+    }
+    if(is.null(speedVec)) {
+      speedVec <- rep(0, length(targetVec))
+    }
     dataDF <- data.frame(name = paste0("ID",targetVec), displacement = as.numeric(dispVec), speed = as.numeric(speedVec))
     # left join (will give NA for the first spot)
     allDF <- merge(x = traceDF, y = dataDF, by = "name", all.x = TRUE)

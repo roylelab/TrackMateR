@@ -184,12 +184,18 @@ plot_tm_intensityHist <- function(input, summary = FALSE, xstr = "Intensity (AU)
   # the column containing mean_intensity may not be present in the data frame
   # if it is present we will use that column, if not we will use paste0("mean_intensity_ch",ch)
   # and if that doesn't exist we will use "mean_intensity_ch1"
+  # first test if there are no columns starting with "mean_intensity"
+  if(!any(grepl("^mean_intensity", colnames(df)))) {
+    warning("No mean_intensity column found in the data frame.")
+    return(NULL)
+  }
   if("mean_intensity" %in% colnames(df)) {
     mean_intensity_col <- "mean_intensity"
-  } else if(paste0("mean_intensity_ch", ch) %in% colnames(df)) {
+  } else if (paste0("mean_intensity_ch", ch) %in% colnames(df)) {
     mean_intensity_col <- paste0("mean_intensity_ch", ch)
   } else {
-    mean_intensity_col <- "mean_intensity_ch1"
+    # match all colnames that start with "mean_intensity_ch" and use the first one
+    mean_intensity_col <- grep("^mean_intensity_ch", colnames(df), value = TRUE)[1]
   }
 
   if(summary) {

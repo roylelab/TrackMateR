@@ -95,11 +95,14 @@ makeSummaryReport <- function(tmList, msdList, jumpList, tddf, fddf, titleStr = 
     intObj <- plot_tm_intensityHist(input = tmList, auto = auto)
     p_intensityHist <- intObj[[1]]
     median_int <- intObj[[2]]
+    if(is.null(median_int)) {
+      median_int <- NA
+    }
   } else {
     p_intensityHist <- plot_tm_intensityHist(input = tmList, auto = FALSE)
   }
 
-  # ggplot histogram of intensities
+  # ggplot histogram of durations
   if(auto == TRUE & summary == FALSE) {
     durObj <- plot_tm_durationHist(input = tmList, auto = auto)
     p_durationHist <- durObj[[1]]

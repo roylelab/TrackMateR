@@ -23,7 +23,7 @@ compareDatasets <- function(...) {
 
   if(!dir.exists("Data")) {
     # there is no cross-platform way to safely choose directory
-    cat("Please organise your XML files in a folder called Data in the working directory\r")
+    cat("Please organise your XML files in a folder called Data in the working directory\n")
     return(-1)
   } else {
     datadir <- "Data"
@@ -38,8 +38,12 @@ compareDatasets <- function(...) {
   condFolderNames <- list.dirs(path = datadir, recursive = FALSE)
   # break if there were no folders in Data directory
   if(identical(condFolderNames, character(0)) == TRUE) {
+    cat("Please organise your XML files in a subfolders within Data in the
+        working directory\n")
     return(-1)
   }
+  # sort the folders alphabetically
+  condFolderNames <- sort(condFolderNames)
 
   for(i in 1:length(condFolderNames)) {
     condFolderPath <- condFolderNames[i]
@@ -49,6 +53,8 @@ compareDatasets <- function(...) {
     if(identical(allTrackMateFiles, character(0)) == TRUE) {
       next
     }
+    # sort the files alphabetically
+    allTrackMateFiles <- sort(allTrackMateFiles)
     # check to see if a calibration file is present
     calibrationFiles <- list.files(condFolderPath, pattern = "*.csv")
     calibrationFile <- paste0(condFolderPath,"/",calibrationFiles[1])
