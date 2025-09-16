@@ -31,5 +31,10 @@ patchwork ggplot
 }
 \description{
 A series of ggplots to compare between conditions.
-Called from `compareDatasets()` this function generates plots using summary data of datasets, per condition.
+Called from `compareDatasets()`, this function generates plots using summary
+data of datasets, per condition.
+}
+\details{
+Note that if one dataset has a long name the names will be wrapped. Wrapping
+not graceful. If you have very long names consider renaming them before running.
 }

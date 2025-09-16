@@ -274,5 +274,12 @@ if (is.null(summary_params) || length(summary_params) == 0) {
   p <- makeComparison(df = megareport, msddf = megamsd, units = units_vec, msdplot = l$msdplot)
   destinationDir <- "Output/Plots/"
   filePath <- paste0(destinationDir, "/comparison.pdf")
-  ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
+  # if there are many conditions, increase width of plot
+  if(length(condFolderNames) < 3) {
+    ggsave(filePath, plot = p, width = 19, height = 19, units = "cm")
+  } else if (length(condFolderNames) > 6) {
+    ggsave(filePath, plot = p, width = 35, height = 19, units = "cm")
+  } else{
+    ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
+  }
 }
