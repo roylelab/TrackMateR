@@ -66,7 +66,7 @@ makeComparison <- function (df, msddf, units = c("um","s"), msdplot = "linlin", 
     geom_sina(alpha = 0.5, stroke = 0) +
     ylim(c(0,NA)) +
     guides(x =  guide_axis(angle = 90)) +
-    labs(x = "", y = substitute(paste("Diffusion coefficient (",mm^2,"/",nn,")"), list(mm = units[1], nn = units [2]))) +
+    labs(x = "", y = substitute(paste("Diffusion coefficient (",mm^2,"/",nn,")"), list(mm = units[1], nn = units[2]))) +
     theme_classic() +
     theme(legend.position = "none")
 

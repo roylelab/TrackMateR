@@ -19,7 +19,10 @@
 #' @export
 compareDatasets <- function(...) {
 
-  condition <- value <- dataid <- cumulative_distance <- track_duration <- mean_intensity <- NULL
+  condition <- value <- dataid <- cumulative_distance <- track_duration <- mean_intensity <- calibrationDF <- timeRes <-NULL
+  megamsd <- megaalpha <- megadee <- megatd <- megaspeed <- megafd <- NULL
+  units_vec <- NULL
+  summary_params <- NULL
 
   if(!dir.exists("Data")) {
     # there is no cross-platform way to safely choose directory
@@ -68,74 +71,67 @@ compareDatasets <- function(...) {
       calibrate <- TRUE
     }
     cat(paste0("\n","Processing ",condFolderName,"\n"))
-    bigtm <- bigmsd <- bigalpha <- bigdee <- bigjd <- bigtd <- bigfd <- data.frame()
-    for(j in 1:length(allTrackMateFiles)) {
+    # Use lists for accumulation
+    bigtm_list <- list()
+    bigcalibration_list <- list()
+    bigmsd_list <- list()
+    bigalpha_list <- list()
+    bigdee_list <- list()
+    bigjd_list <- list()
+    bigjdParams_list <- list()
+    bigtd_list <- list()
+    bigfd_list <- list()
+    bigreport_list <- list()
+
+    # Parallelize inner loop over XML files
+    process_file <- function(j) {
       fileName <- allTrackMateFiles[j]
       thisFilePath <- paste0(condFolderPath, "/", fileName)
-      # read dataset
       tmObj <- readTrackMateXML(XMLpath = thisFilePath, slim = TRUE)
       if(is.null(tmObj)) {
         cat(paste0("Skipping ",fileName," - no data found!\n"))
-        next
+        return(NULL)
       }
-      # scale dataset if required
       if(calibrate) {
         calibrationDF <- tmObj[[2]]
-        # scalar for conversion is new / old (units not relevant)
         calibrationXY <- calibDF[1,1] / calibrationDF[1,1]
         calibrationT <- calibDF[2,1] / calibrationDF[2,1]
-        # 0 in calibDF indicates no scaling is to be done
         calibrationXY <- ifelse(calibrationXY == 0, 1, calibrationXY)
         calibrationT <- ifelse(calibrationT == 0, 1, calibrationT)
-        # ignore an error of 2.5%
         calibrationXY <- ifelse(calibrationXY < 1.025 & calibrationXY > 0.975, 1, calibrationXY)
         calibrationT <- ifelse(calibrationT < 1.025 & calibrationT > 0.975, 1, calibrationT)
-        if(calibrationXY != 1 & calibrationT != 1) {
+  if(calibrationXY != 1 && calibrationT != 1) {
           tmObj <- correctTrackMateData(dataList = tmObj, xyscalar = calibrationXY, tscalar = calibrationT, xyunit = calibDF[1,2], tunit = calibDF[2,2])
-        } else if(calibrationXY != 1 & calibrationT == 1) {
+  } else if(calibrationXY != 1 && calibrationT == 1) {
           tmObj <- correctTrackMateData(dataList = tmObj, xyscalar = calibrationXY, xyunit = calibDF[1,2])
-        } else if(calibrationXY == 1 & calibrationT != 1) {
+  } else if(calibrationXY == 1 && calibrationT != 1) {
           tmObj <- correctTrackMateData(dataList = tmObj, tscalar = calibrationT, tunit = calibDF[2,2])
         } else {
-          # the final possibility is nothing needs scaling but units need to change.
-          # do not test if they are the same just flush the units with the values in the csv file
           tmObj <- correctTrackMateData(dataList = tmObj, xyunit = calibDF[1,2], tunit = calibDF[2,2])
         }
       }
-      # we can filter here if required - for example only analyse tracks of certain length
       tmDF <- tmObj[[1]]
       calibrationDF <- tmObj[[2]]
-      # sanity check - probably not needed
       if(is.null(tmDF)) {
         cat(paste0("Skipping ",fileName," - no data found!\n"))
-        next
+        return(NULL)
       }
-      # if the data is not rich enough for a summary we will skip it
       if(calibrationDF[5,1] < 3 & calibrationDF[6,1] < 10) {
         cat(paste0("Skipping ",fileName," as it has less than 3 tracks and longest track has less than 10 frames\n"))
-        next
+        return(NULL)
       }
-      # take the units
-      units <- calibrationDF$unit[1:2]
-
-      ## we need to combine data frames
-      # first add a column to id the data
+  units_vec <- calibrationDF$unit[1:2]
       thisdataid <- paste0(condFolderName,"_",as.character(j))
       tmDF$dataid <- thisdataid
-
-      # calculate MSD
       msdObj <- calculateMSD(tmDF, N = 3, short = 8)
       msdDF <- msdObj[[1]]
       alphaDF <- msdObj[[2]]
       deeDF <- msdObj[[3]]
-      if(!is.null(msdDF) | !is.null(alphaDF) | !is.null(deeDF)) {
-        # we need to add the dataid to the summary
+  if(!is.null(msdDF) || !is.null(alphaDF) || !is.null(deeDF)) {
         msdDF$dataid <- thisdataid
         alphaDF$dataid <- thisdataid
         deeDF$dataid <- thisdataid
       }
-
-      # jump distance calc with deltaT of 1
       deltaT <- 1
       jdObj <- calculateJD(dataList = tmObj, deltaT = l$deltaT, nPop = l$nPop, mode = l$mode, init = l$init, timeRes = l$timeRes, breaks = l$breaks)
       jdDF <- jdObj[[1]]
@@ -146,74 +142,88 @@ compareDatasets <- function(...) {
         timeRes <- jdObj[[2]]
         jdObj <- list(jdDF,timeRes)
       }
-      # track density with a radius of 1.5 units
       tdDF <- calculateTrackDensity(dataList = tmObj, radius = l$radius)
       if(!is.null(tdDF)) {
         tdDF$dataid <- thisdataid
       }
-      # fractal dimension
       fdDF <- calculateFD(dataList = tmObj)
       if(!is.null(fdDF)) {
         fdDF$dataid <- thisdataid
       }
-
-      # add to the big dataframes
-      if(!is.null(tmDF)) {
-        bigtm <- rbind(bigtm,tmDF)
-      }
-      if(!is.null(msdDF)) {
-        bigmsd <- rbind(bigmsd,msdDF)
-      }
-      if(!is.null(alphaDF)) {
-        bigalpha <- rbind(bigalpha,alphaDF)
-      }
-      if(!is.null(deeDF)) {
-        bigdee <- rbind(bigdee,deeDF)
-      }
-      if(!is.null(jdDF)) {
-        bigjd <- rbind(bigjd,jdDF)
-      }
-      if(!is.null(tdDF)) {
-        bigtd <- rbind(bigtd,tdDF)
-      }
-      if(!is.null(fdDF)) {
-        bigfd <- rbind(bigfd,fdDF)
-      }
-
-      # create the report for this dataset
-      fileName <- tools::file_path_sans_ext(basename(thisFilePath))
+      fileNameBase <- tools::file_path_sans_ext(basename(thisFilePath))
       both <- makeSummaryReport(tmList = tmObj, msdList = msdObj, jumpList = jdObj, tddf = tdDF, fddf = fdDF,
-                                titleStr = condFolderName, subStr = fileName, auto = TRUE, summary = FALSE,
+                                titleStr = condFolderName, subStr = fileNameBase, auto = TRUE, summary = FALSE,
                                 msdplot = l$msdplot)
       p <- both[[1]]
       destinationDir <- paste0("Output/Plots/", condFolderName)
       setupOutputPath(destinationDir)
       filePath <- paste0(destinationDir, "/report_",as.character(j),".pdf")
       ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
-      # retrieve other data
       df_report <- both[[2]]
       df_report$condition <- condFolderName
       df_report$dataid <- thisdataid
-      if(i == 1 & j == 1) {
-        megareport <- df_report
-      } else if(!exists("megareport")) {
-        megareport <- df_report
-      } else {
-        megareport <- rbind(megareport,df_report)
-      }
+      return(list(tmDF = tmDF, calibrationDF = calibrationDF, msdDF = msdDF, alphaDF = alphaDF, deeDF = deeDF, jdDF = jdDF, jdParams = timeRes, tdDF = tdDF, fdDF = fdDF, df_report = df_report))
     }
-    bigtmObj <- list(bigtm,calibrationDF)
-    bigmsdObj <- list(bigmsd,bigalpha,bigdee)
-    bigjdObj <- list(bigjd,timeRes)
-    # now we have our combined dataset we can make a summary
-    # note we use the timeRes of the final dataset; so it is suitable for only when all files have the same calibration
-    summaryObj <- makeSummaryReport(tmList = bigtmObj, msdList = bigmsdObj, jumpList = bigjdObj, tddf = bigtd, fddf = bigfd,
-                                    titleStr = condFolderName, subStr = "Summary", auto = TRUE, summary = TRUE,
-                                    msdplot = l$msdplot)
-    p <- summaryObj[[1]]
-    destinationDir <- paste0("Output/Plots/", condFolderName)
-    filePath <- paste0(destinationDir, "/combined.pdf")
-    ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
+
+    # Use mclapply for parallel processing (on non-Windows)
+    results <- if (.Platform$OS.type == "windows") {
+      lapply(seq_along(allTrackMateFiles), process_file)
+    } else {
+      mclapply(seq_along(allTrackMateFiles), process_file, mc.cores = detectCores())
+    }
+
+    for (res in results) {
+      if (is.null(res)) next
+      if (!is.null(res$tmDF)) bigtm_list[[length(bigtm_list)+1]] <- res$tmDF
+      if (!is.null(res$calibrationDF)) bigcalibration_list[[length(bigcalibration_list)+1]] <- res$calibrationDF
+      if (!is.null(res$msdDF)) bigmsd_list[[length(bigmsd_list)+1]] <- res$msdDF
+      if (!is.null(res$alphaDF)) bigalpha_list[[length(bigalpha_list)+1]] <- res$alphaDF
+      if (!is.null(res$deeDF)) bigdee_list[[length(bigdee_list)+1]] <- res$deeDF
+      if (!is.null(res$jdDF)) bigjd_list[[length(bigjd_list)+1]] <- res$jdDF
+      if (!is.null(res$jdParams)) bigjdParams_list[[length(bigjdParams_list)+1]] <- res$jdParams
+      if (!is.null(res$tdDF)) bigtd_list[[length(bigtd_list)+1]] <- res$tdDF
+      if (!is.null(res$fdDF)) bigfd_list[[length(bigfd_list)+1]] <- res$fdDF
+      if (!is.null(res$df_report)) bigreport_list[[length(bigreport_list)+1]] <- res$df_report
+    }
+
+  bigtm <- if (length(bigtm_list) > 0) do.call(rbind, bigtm_list) else data.frame()
+  bigmsd <- if (length(bigmsd_list) > 0) do.call(rbind, bigmsd_list) else data.frame()
+  bigalpha <- if (length(bigalpha_list) > 0) do.call(rbind, bigalpha_list) else data.frame()
+  bigdee <- if (length(bigdee_list) > 0) do.call(rbind, bigdee_list) else data.frame()
+  bigjd <- if (length(bigjd_list) > 0) do.call(rbind, bigjd_list) else data.frame()
+  bigtd <- if (length(bigtd_list) > 0) do.call(rbind, bigtd_list) else data.frame()
+  bigfd <- if (length(bigfd_list) > 0) do.call(rbind, bigfd_list) else data.frame()
+  bigreport <- if (length(bigreport_list) > 0) do.call(rbind, bigreport_list) else data.frame()
+
+  # Fix: collect all valid parameter lists from results and use the first one for summary
+    # Extract units_vec from first valid result
+if (is.null(units_vec)) {
+  for (res in results) {
+    if (!is.null(res) && !is.null(res$calibrationDF)) {
+      units_vec <- res$calibrationDF$unit[1:2]
+      break
+    }
+  }
+}
+
+# Extract summary_params from first valid result
+all_param_lists <- lapply(results, function(res) {
+  if (!is.null(res) && !is.null(res$jdParams)) res$jdParams else NULL
+})
+valid_param_lists <- Filter(Negate(is.null), all_param_lists)
+if (is.null(summary_params) || length(summary_params) == 0) {
+  summary_params <- if (length(valid_param_lists) > 0) valid_param_lists[[1]] else list()
+}
+  bigtmObj <- list(bigtm,calibrationDF)
+  bigmsdObj <- list(bigmsd,bigalpha,bigdee)
+  bigjdObj <- list(bigjd, summary_params)
+  summaryObj <- makeSummaryReport(tmList = bigtmObj, msdList = bigmsdObj, jumpList = bigjdObj, tddf = bigtd, fddf = bigfd,
+                  titleStr = condFolderName, subStr = "Summary", auto = TRUE, summary = TRUE,
+                  msdplot = l$msdplot)
+  p <- summaryObj[[1]]
+  destinationDir <- paste0("Output/Plots/", condFolderName)
+  filePath <- paste0(destinationDir, "/combined.pdf")
+  ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
     # save data as csv
     destinationDir <- paste0("Output/Data/", condFolderName)
     setupOutputPath(destinationDir)
@@ -230,20 +240,22 @@ compareDatasets <- function(...) {
       summarise(cumdist = max(cumulative_distance), cumtime = max(track_duration), intensity = max(mean_intensity))
     bigspeed$speed <- bigspeed$cumdist / bigspeed$cumtime
     bigspeed$condition <- condFolderName
-    if(i == 1 | !exists("megamsd")) {
+    if (is.null(megamsd)) {
       megamsd <- msdSummary
       megaalpha <- bigalpha
       megadee <- bigdee
       megatd <- bigtd
       megaspeed <- bigspeed
       megafd <- bigfd
+      megareport <- bigreport
     } else {
-      megamsd <- rbind(megamsd,msdSummary)
-      megaalpha <- rbind(megaalpha,bigalpha)
-      megadee <- rbind(megadee,bigdee)
-      megatd <- rbind(megatd,bigtd)
-      megaspeed <- rbind(megaspeed,bigspeed)
-      megafd <- rbind(megafd,bigfd)
+      megamsd <- rbind(megamsd, msdSummary)
+      megaalpha <- rbind(megaalpha, bigalpha)
+      megadee <- rbind(megadee, bigdee)
+      megatd <- rbind(megatd, bigtd)
+      megaspeed <- rbind(megaspeed, bigspeed)
+      megafd <- rbind(megafd, bigfd)
+      megareport <- rbind(megareport, bigreport)
     }
   }
 
@@ -259,7 +271,7 @@ compareDatasets <- function(...) {
   write.csv(megatrace, paste0(destinationDir, "/allTraceData.csv"), row.names = FALSE)
 
   # generate the comparison plots and save
-  p <- makeComparison(df = megareport, msddf = megamsd, units = units, msdplot = l$msdplot)
+  p <- makeComparison(df = megareport, msddf = megamsd, units = units_vec, msdplot = l$msdplot)
   destinationDir <- "Output/Plots/"
   filePath <- paste0(destinationDir, "/comparison.pdf")
   ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")

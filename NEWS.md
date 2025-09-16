@@ -3,7 +3,8 @@
 # TrackMateR 0.3.12
 
 - Moved from {XML} to {xml2} for reading TrackMate XML files. Future-proof but currently slower.
-- Speed improvements in analysis of large datasets
+- Large speed improvement when analysing multiple datasets.
+- Better memory management when analysing large datasets.
 
 # TrackMateR 0.3.11
 
