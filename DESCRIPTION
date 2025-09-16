@@ -1,7 +1,7 @@
 Package: TrackMateR
 Type: Package
 Title: Working with TrackMate outputs in R
-Version: 0.3.11
+Version: 0.3.12
 Authors@R:
     person(given = "Stephen J",
            family = "Royle",
@@ -21,16 +21,13 @@ VignetteBuilder:
   knitr,
   rmarkdown
 Imports:
-  doParallel,
   dplyr,
-  foreach,
   ggplot2,
   ggforce,
   patchwork,
-  parallelly,
   reshape2,
   utils,
-  XML,
+  xml2,
   zoo
 Suggests:
   knitr,

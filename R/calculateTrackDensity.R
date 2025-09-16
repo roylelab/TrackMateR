@@ -16,49 +16,46 @@
 #' tdDF <- calculateTrackDensity(dataList = tmObj, radius = 2)
 #' @export
 
-calculateTrackDensity <- function(dataList, radius = 1) {
-  x <- y <- trace <- NULL
 
-  if(inherits(dataList, "list")) {
-    df <- dataList[[1]]
-    calibration <- dataList[[2]]
-  } else {
+calculateTrackDensity <- function(dataList, radius = 1) {
+  # base R optimized version
+  if (!inherits(dataList, "list")) {
     cat("Function requires a list of TrackMate data and calibration data\n")
     return(NULL)
   }
-  # make a list of all traces (this is the filtered list of traces from TrackMate XML)
+  df <- dataList[[1]]
+  calibration <- dataList[[2]]
   traceList <- unique(df$trace)
 
-  # for each trace, find the first frame
-  for (i in traceList) {
-    a <- df %>%
-      filter(trace == i) %>%
-      select(frame, x, y)
-    frame0 <- a$frame[1]
-    x0 <- a$x[1]
-    y0 <- a$y[1]
-    # select first frame for this track
-    a <- df %>%
-      filter(frame == frame0) %>%
-      select(x, y)
-    # calculate the distance from x0, y0 to all other coords
-    distances <- find_distances(x0,y0,a)
-    # count how many are less than search radius (this will include the track itself, so subtract 1)
-    neighbours <- sum(distances <= radius, na.rm = TRUE) - 1
-    # calculate how much of the search circle was inside the frame
-    search_fraction <- find_td_area(r = radius, xy = c(x0,y0), a= c(0,calibration[3,1]), b = c(0,calibration[4,1])) / (pi * radius^2)
-    subdf <- data.frame(trace = i,
-                        neighbours = neighbours,
-                        fraction = search_fraction)
-    if(i == traceList[1]) {
-      dfall <- subdf
-    } else {
-      dfall <- rbind(dfall,subdf)
-    }
-  }
-  # divide the count by the fraction of circle that was inside the frame to give "density" - do this at the end
-  dfall$density <- dfall$neighbours / dfall$fraction
+  # Precompute starting positions for all traces
+  first_frame_idx <- match(traceList, df$trace)
+  frame0s <- df$frame[first_frame_idx]
+  x0s <- df$x[first_frame_idx]
+  y0s <- df$y[first_frame_idx]
 
+  # Preallocate result vectors
+  neighbours <- numeric(length(traceList))
+  fractions <- numeric(length(traceList))
+
+  for (j in seq_along(traceList)) {
+    frame0 <- frame0s[j]
+    x0 <- x0s[j]
+    y0 <- y0s[j]
+    # select all tracks in the same starting frame
+    idx <- which(df$frame == frame0)
+    x_all <- df$x[idx]
+    y_all <- df$y[idx]
+    # vectorized distance calculation
+    dists <- sqrt((x_all - x0)^2 + (y_all - y0)^2)
+    neighbours[j] <- sum(dists <= radius, na.rm = TRUE) - 1
+    # search area fraction
+    fractions[j] <- find_td_area(r = radius, xy = c(x0, y0), a = c(0, calibration[3,1]), b = c(0, calibration[4,1])) / (pi * radius^2)
+  }
+
+  dfall <- data.frame(trace = traceList,
+                      neighbours = neighbours,
+                      fraction = fractions)
+  dfall$density <- dfall$neighbours / dfall$fraction
   return(dfall)
 }
 
