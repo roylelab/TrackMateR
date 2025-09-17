@@ -1,7 +1,11 @@
 #' Make Comparison Plots
 #'
 #' A series of ggplots to compare between conditions.
-#' Called from `compareDatasets()` this function generates plots using summary data of datasets, per condition.
+#' Called from `compareDatasets()`, this function generates plots using summary
+#' data of datasets, per condition.
+#'
+#' Note that if one dataset has a long name the names will be wrapped. Wrapping
+#' not graceful. If you have very long names consider renaming them before running.
 #'
 #' @param df data frame called megareport
 #' @param msddf data frame of msd averages per dataset
@@ -18,6 +22,20 @@ makeComparison <- function (df, msddf, units = c("um","s"), msdplot = "linlin", 
   options(warn = -1)
 
   symlim <- findLog2YAxisLimits(df$alpha)
+  # find longest condition name
+  maxchar <- max(nchar(as.character(df$condition)))
+  lablength <- 15
+  if(maxchar > lablength) {
+    wrapit <- TRUE
+  } else {
+    wrapit <- FALSE
+  }
+  if(wrapit) {
+    # this is a hack but it deals with labels with no spaces (which is what we want)
+    # insert a newline every 20 characters
+    expr <- paste0("(.{",lablength,"})")
+    df$condition <- gsub(expr, "\\1\n", df$condition)
+  }
 
   # plot alpha comparison
   p_alpha <- ggplot(data = df, aes(x = condition, y = alpha, colour = condition)) +
@@ -66,7 +84,7 @@ makeComparison <- function (df, msddf, units = c("um","s"), msdplot = "linlin", 
     geom_sina(alpha = 0.5, stroke = 0) +
     ylim(c(0,NA)) +
     guides(x =  guide_axis(angle = 90)) +
-    labs(x = "", y = substitute(paste("Diffusion coefficient (",mm^2,"/",nn,")"), list(mm = units[1], nn = units [2]))) +
+    labs(x = "", y = substitute(paste("Diffusion coefficient (",mm^2,"/",nn,")"), list(mm = units[1], nn = units[2]))) +
     theme_classic() +
     theme(legend.position = "none")
 

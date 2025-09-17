@@ -15,147 +15,99 @@
 #' calibrationDF <- tmObj[[2]]
 #' @export
 
-readTrackMateXML<- function(XMLpath, slim = FALSE){
-  # check if XML file exists
-  if(!file.exists(XMLpath)) {
+
+readTrackMateXML <- function(XMLpath, slim = FALSE) {
+  # Requires xml2 package
+  if (!file.exists(XMLpath)) {
     cat("XML file does not exist: ", XMLpath, "\n")
     return(NULL)
   }
-  # get necessary XMLNodeSet
-  e <- xmlParse(XMLpath)
-  track <- getNodeSet(e, "//Track")
-  if(length(track) == 0) {
+
+  e <- read_xml(XMLpath)
+  track_nodes <- xml_find_all(e, ".//Track")
+  if (length(track_nodes) == 0) {
     cat("No tracks found in XML file\n")
     return(NULL)
   }
-  filtered <- getNodeSet(e, "//TrackID")
-  subdoc <- getNodeSet(e,"//AllSpots//SpotsInFrame//Spot")
-  sublist <- getNodeSet(e,"//FeatureDeclarations//SpotFeatures//Feature/@feature")
-  attrName <- c("name",unlist(sublist))
-  # what are the units?
-  attrList <- c("spatialunits","timeunits")
-  unitVec <- sapply(attrList, function(x) xpathSApply(e, "//Model", xmlGetAttr, x))
-  unitVec <- c(unitVec,"widthpixels","heightpixels","ntraces","maxframes")
-  attrList <- c("pixelwidth","timeinterval","width","height")
-  valueVec <- sapply(attrList, function(x) xpathSApply(e, "//ImageData", xmlGetAttr, x))
-  calibrationDF <- data.frame(value = c(as.numeric(valueVec),0,0),
-                              unit = unitVec)
-  # convert the width and height of the image from pixels (0-based so minus 1 from wdth/height) to whatever units the TrackMate file uses
-  calibrationDF[3:4,1] <- (calibrationDF[3:4,1] - 1) * calibrationDF[1,1]
-  # use s for seconds
-  calibrationDF[2,2] <- ifelse(calibrationDF[2,2] == "sec", "s", calibrationDF[2,2])
-  # readout what the units were and warn if spatial units are pixels
-  cat("Units are: ",calibrationDF[1,1],calibrationDF[1,2],"and",calibrationDF[2,1],calibrationDF[2,2],"\n")
-  if(unitVec[1] == "pixel") {
+  filtered_nodes <- xml_find_all(e, ".//TrackID")
+  spot_nodes <- xml_find_all(e, ".//AllSpots//SpotsInFrame//Spot")
+  feature_nodes <- xml_find_all(e, ".//FeatureDeclarations//SpotFeatures//Feature")
+  attrName <- c("name", xml_attr(feature_nodes, "feature"))
+
+  # Units and calibration
+  model_node <- xml_find_first(e, ".//Model")
+  unitVec <- c(xml_attr(model_node, "spatialunits"), xml_attr(model_node, "timeunits"), "widthpixels", "heightpixels", "ntraces", "maxframes")
+  image_node <- xml_find_first(e, ".//ImageData")
+  valueVec <- c(xml_attr(image_node, "pixelwidth"), xml_attr(image_node, "timeinterval"), xml_attr(image_node, "width"), xml_attr(image_node, "height"))
+  calibrationDF <- data.frame(value = as.numeric(c(valueVec, 0, 0)), unit = unitVec)
+  calibrationDF[3:4, 1] <- (calibrationDF[3:4, 1] - 1) * calibrationDF[1, 1]
+  calibrationDF[2, 2] <- ifelse(calibrationDF[2, 2] == "sec", "s", calibrationDF[2, 2])
+  cat("Units are: ", calibrationDF[1, 1], calibrationDF[1, 2], "and", calibrationDF[2, 1], calibrationDF[2, 2], "\n")
+  if (unitVec[1] == "pixel") {
     cat("Spatial units are in pixels - consider transforming to real units\n")
   }
-  # which channel is being tracked?
-  targetVec <-  xpathSApply(e, "//DetectorSettings", xmlGetAttr, "TARGET_CHANNEL")
-  calibrationDF[7,1] <- as.numeric(targetVec)
-  calibrationDF[7,2] <- "channel"
+  detector_node <- xml_find_first(e, ".//DetectorSettings")
+  target_channel <- xml_attr(detector_node, "TARGET_CHANNEL")
+  calibrationDF[7, 1] <- as.numeric(target_channel)
+  calibrationDF[7, 2] <- "channel"
 
-  # if we are doing slim processing, we only get the minimum data required to process the tracks
-  if(slim) {
-    # we only need a subset of possible attributes
-    slimAttr <- c("name", "POSITION_X", "POSITION_Y", "POSITION_Z",
-                  "POSITION_T", "FRAME", "MEAN_INTENSITY",
-                  paste0("MEAN_INTENSITY_CH",targetVec))
+  if (slim) {
+    slimAttr <- c("name", "POSITION_X", "POSITION_Y", "POSITION_Z", "POSITION_T", "FRAME", "MEAN_INTENSITY", paste0("MEAN_INTENSITY_CH", target_channel))
     attrName <- attrName[attrName %in% slimAttr]
   }
 
-  # multicore processing
-  numCores <- parallelly::availableCores()
-
-  if (.Platform[["OS.type"]] == "windows") {
-    ## PSOCK-based parallel processing
-    cl <- parallel::makeCluster(numCores)
-    on.exit(parallel::stopCluster(cl))
-    registerDoParallel(cl = cl)
-  } else {
-    ## Forked parallel processing
-    registerDoParallel(cores = numCores)
+  # Extract spot attributes efficiently
+  spot_data <- lapply(attrName, function(attr) xml_attr(spot_nodes, attr))
+  dtf <- as.data.frame(spot_data, stringsAsFactors = FALSE)
+  for (i in 2:length(attrName)) {
+    suppressWarnings(dtf[, i] <- as.numeric(dtf[, i]))
   }
-
-  # perform parallel read
-  # test if we are running on windows
-  if (.Platform[["OS.type"]] == "windows") {
-    cat("Collecting spot data...\n")
-    dtf <- as.data.frame(foreach(i = 1:length(attrName), .packages = c("foreach","XML"), .combine = cbind) %do% {
-      sapply(subdoc, xmlGetAttr, attrName[i])
-    })
-  } else {
-    cat(paste0("Collecting spot data. Using ",numCores," cores\n"))
-    dtf <- as.data.frame(foreach(i = 1:length(attrName), .combine = cbind) %dopar% {
-      sapply(subdoc, xmlGetAttr, attrName[i])
-    })
-  }
-
-  for (i in 2:length(attrName)){
-    suppressWarnings(dtf[,i] <- as.numeric(as.character(dtf[,i])))
-  }
-  # more R-like headers
   headerNames <- tolower(attrName)
-  # in the case of slim = TRUE, we rename the MEAN_INTENSITY_CHX column to
-  # remove _CH1 or whatever from any header
-  if(slim) {
-    headerNames <- gsub("_ch\\d$","",headerNames,ignore.case = TRUE)
+  if (slim) {
+    headerNames <- gsub("_ch\\d$", "", headerNames, ignore.case = TRUE)
   }
-  # change x y z t
-  headerNames <- gsub("^position\\w","",headerNames,ignore.case = TRUE)
+  headerNames <- gsub("^position\\w", "", headerNames, ignore.case = TRUE)
   names(dtf) <- headerNames
 
   cat("Matching track data...\n")
-
-  # trace is an alternative name for track
-  IDtrace <- data.frame(name = NA, trace = NA, displacement = NA, speed = NA)
-
-  for (i in seq(along = track)){
-    subDoc = xmlDoc(track[[i]])
-    IDvec <- unique(c(unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPOT_SOURCE_ID")),
-                      unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPOT_TARGET_ID"))))
-    traceVec <- rep(sapply(track[i], function(el){xmlGetAttr(el, "TRACK_ID")}), length(IDvec))
-    traceDF <- data.frame(name = paste0("ID",IDvec), trace = traceVec)
-    # now retrieve displacement and speed for target spots in track
-    targetVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPOT_TARGET_ID"))
-    dispVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "DISPLACEMENT"))
-    speedVec <- unlist(xpathApply(subDoc, "//Edge", xmlGetAttr, "SPEED"))
-    # if the user has not added Analyzers, displacement and speed will be NULL
-    if(is.null(dispVec)) {
-      dispVec <- rep(0, length(targetVec))
-    }
-    if(is.null(speedVec)) {
-      speedVec <- rep(0, length(targetVec))
-    }
-    dataDF <- data.frame(name = paste0("ID",targetVec), displacement = as.numeric(dispVec), speed = as.numeric(speedVec))
-    # left join (will give NA for the first spot)
-    allDF <- merge(x = traceDF, y = dataDF, by = "name", all.x = TRUE)
-    allDF$displacement <- ifelse(is.na(allDF$displacement), 0, allDF$displacement)
-    allDF$speed <- ifelse(is.na(allDF$speed), 0, allDF$speed)
-    # grow the dataframe
-    IDtrace <- rbind(IDtrace, allDF)
+  # Preallocate list for track info
+  IDtrace_list <- vector("list", length(track_nodes))
+  for (i in seq_along(track_nodes)) {
+    tr_node <- track_nodes[[i]]
+    edge_nodes <- xml_find_all(tr_node, ".//Edge")
+    source_ids <- xml_attr(edge_nodes, "SPOT_SOURCE_ID")
+    target_ids <- xml_attr(edge_nodes, "SPOT_TARGET_ID")
+    IDvec <- unique(c(source_ids, target_ids))
+    trace_id <- xml_attr(tr_node, "TRACK_ID")
+    traceDF <- data.frame(name = paste0("ID", IDvec), trace = trace_id, stringsAsFactors = FALSE)
+    dispVec <- xml_attr(edge_nodes, "DISPLACEMENT")
+    speedVec <- xml_attr(edge_nodes, "SPEED")
+    # handle missing analyzers
+    if (is.null(dispVec)) dispVec <- rep(0, length(target_ids))
+    if (is.null(speedVec)) speedVec <- rep(0, length(target_ids))
+    dataDF <- data.frame(name = paste0("ID", target_ids), displacement = as.numeric(dispVec), speed = as.numeric(speedVec), stringsAsFactors = FALSE)
+    allDF <- merge(traceDF, dataDF, by = "name", all.x = TRUE)
+    allDF$displacement[is.na(allDF$displacement)] <- 0
+    allDF$speed[is.na(allDF$speed)] <- 0
+    IDtrace_list[[i]] <- allDF
   }
+  IDtrace <- do.call(rbind, IDtrace_list)
 
-  # merge track information with spot data
-  daten <- merge(IDtrace, dtf, by="name")
-  # now we subset for filtered tracks
-  FTvec <- sapply(filtered, xmlGetAttr, "TRACK_ID")
-  daten <- subset(daten, trace %in% FTvec)
-  # sort final data frame
-  daten <- daten[order(daten$trace, daten$t),]
+  daten <- merge(IDtrace, dtf, by = "name")
+  FTvec <- xml_attr(filtered_nodes, "TRACK_ID")
+  daten <- daten[daten$trace %in% FTvec, ]
+  daten <- daten[order(daten$trace, daten$t), ]
 
   cat("Calculating distances...\n")
-
-  # cumulative distance and duration
-  cumdist <- numeric()
+  cumdist <- numeric(nrow(daten))
+  dur <- numeric(nrow(daten))
   cumdist[1] <- 0
-  dur <- numeric()
   dur[1] <- 0
   startdur <- daten$t[1]
-
-  for (i in 2:nrow(daten)){
-    if(daten$trace[i] == daten$trace[i-1]) {
-      cumdist[i] <- cumdist[i-1] + daten$displacement[i]
-    }else{
+  for (i in 2:nrow(daten)) {
+    if (daten$trace[i] == daten$trace[i - 1]) {
+      cumdist[i] <- cumdist[i - 1] + daten$displacement[i]
+    } else {
       cumdist[i] <- 0
       startdur <- daten$t[i]
     }
@@ -164,41 +116,24 @@ readTrackMateXML<- function(XMLpath, slim = FALSE){
   daten$cumulative_distance <- cumdist
   daten$track_duration <- dur
 
-  # users have reported tracks/traces with multiple spots per frame which cannot be processed
-  # possibly caused by track splitting or merging. Produce warning about this.
-  b <- daten %>% group_by(trace,frame) %>%
-    reframe(n = n())
-  # because it is not possible to have n = 0 in this column (as it is reframe) we can do
-  if(sum(b$n) > nrow(b)) {
+  # Check for multiple spots per frame
+  b <- aggregate(name ~ trace + frame, daten, length)
+  if (sum(b$name) > nrow(b)) {
     cat("Warning: Detected multiple spots per frame for one or more tracks.\nTrackMateR will only process single tracks. Subsequent analysis will likely fail!\n")
   }
 
-  # it is possible that xy coords lie outside the image(!)
-  # we can detect xy coords that are less than 0,0 and then use this information to offset *all* coords by this
-  # this is necessary because later code relies on the origin
+  # Offset coordinates if needed
   minx <- min(daten$x)
   miny <- min(daten$y)
-  if(minx < 0) {
-    daten$x <- daten$x - minx
-  }
-  if(miny < 0) {
-    daten$y <- daten$y - miny
-  }
-  # now we need to redefine the size of the "image" because xy coords may lie outside, or they may now lie outside after offsetting
+  if (minx < 0) daten$x <- daten$x - minx
+  if (miny < 0) daten$y <- daten$y - miny
   maxx <- max(daten$x)
   maxy <- max(daten$y)
-  if(maxx > calibrationDF[3,1]) {
-    calibrationDF[3,1] <- ceiling(maxx)
-  }
-  if(maxy > calibrationDF[4,1]) {
-    calibrationDF[4,1] <- ceiling(maxy)
-  }
-  # we need to know how many traces we have and how many frames is the longest one for later
-  calibrationDF[5,1] <- length(unique(daten$trace))
-  calibrationDF[6,1] <- max(daten$track_duration) / calibrationDF[2,1]
+  if (maxx > calibrationDF[3, 1]) calibrationDF[3, 1] <- ceiling(maxx)
+  if (maxy > calibrationDF[4, 1]) calibrationDF[4, 1] <- ceiling(maxy)
+  calibrationDF[5, 1] <- length(unique(daten$trace))
+  calibrationDF[6, 1] <- max(daten$track_duration) / calibrationDF[2, 1]
 
-  # daten is our dataframe of all data, calibrationDF is the calibration data
-  dfList <- list(daten,calibrationDF)
-
+  dfList <- list(daten, calibrationDF)
   return(dfList)
 }

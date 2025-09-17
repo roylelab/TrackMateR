@@ -1,11 +1,10 @@
-#' @importFrom foreach %do%
-#' @importFrom foreach %dopar%
-#' @importFrom foreach foreach
 #' @importFrom ggforce geom_sina
 #' @importFrom graphics frame
 #' @importFrom graphics hist
-#' @importFrom parallelly availableCores
+#' @importFrom parallel detectCores
+#' @importFrom parallel mclapply
 #' @importFrom reshape2 melt
+#' @importFrom stats aggregate
 #' @importFrom stats approx
 #' @importFrom stats quantile
 #' @importFrom stats sd
@@ -19,17 +18,13 @@
 #' @importFrom utils install.packages
 #' @importFrom utils read.csv
 #' @importFrom utils write.csv
-#' @importFrom XML xmlParse
-#' @importFrom XML getNodeSet
-#' @importFrom XML xpathSApply
-#' @importFrom XML xmlGetAttr
-#' @importFrom XML xmlDoc
-#' @importFrom XML xpathApply
+#' @importFrom xml2 read_xml
+#' @importFrom xml2 xml_find_all
+#' @importFrom xml2 xml_find_first
+#' @importFrom xml2 xml_attr
 #' @importFrom zoo rollmean
 #' @import ggplot2
 #' @import dplyr
 #' @import patchwork
-#' @import doParallel
-#' @import parallelly
 NULL
 #> NULL

@@ -41,6 +41,10 @@ fittingJD <- function(jumpList) {
   timeRes <- params$timeRes
   breaks <- params$breaks
 
+  if(is.null(nPop)) {
+    return(NULL)
+  }
+
   if(nPop < 1 | nPop > 3) {
     return(NULL)
   }
