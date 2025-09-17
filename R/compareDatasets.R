@@ -169,7 +169,7 @@ compareDatasets <- function(...) {
     results <- if (.Platform$OS.type == "windows") {
       lapply(seq_along(allTrackMateFiles), process_file)
     } else {
-      mclapply(seq_along(allTrackMateFiles), process_file, mc.cores = detectCores())
+      mclapply(seq_along(allTrackMateFiles), process_file, mc.cores = detectCores() - 2)
     }
 
     for (res in results) {
@@ -205,6 +205,9 @@ if (is.null(units_vec)) {
     }
   }
 }
+# package into a data frame that can be used by makeSummaryReport() to get the units
+dummyCalibrationDF <- data.frame(value = c(1, 1),
+                             unit = units_vec)
 
 # Extract summary_params from first valid result
 all_param_lists <- lapply(results, function(res) {
@@ -214,8 +217,8 @@ valid_param_lists <- Filter(Negate(is.null), all_param_lists)
 if (is.null(summary_params) || length(summary_params) == 0) {
   summary_params <- if (length(valid_param_lists) > 0) valid_param_lists[[1]] else list()
 }
-  bigtmObj <- list(bigtm,calibrationDF)
-  bigmsdObj <- list(bigmsd,bigalpha,bigdee)
+  bigtmObj <- list(bigtm, dummyCalibrationDF)
+  bigmsdObj <- list(bigmsd, bigalpha, bigdee)
   bigjdObj <- list(bigjd, summary_params)
   summaryObj <- makeSummaryReport(tmList = bigtmObj, msdList = bigmsdObj, jumpList = bigjdObj, tddf = bigtd, fddf = bigfd,
                   titleStr = condFolderName, subStr = "Summary", auto = TRUE, summary = TRUE,
@@ -279,7 +282,7 @@ if (is.null(summary_params) || length(summary_params) == 0) {
     ggsave(filePath, plot = p, width = 19, height = 19, units = "cm")
   } else if (length(condFolderNames) > 6) {
     ggsave(filePath, plot = p, width = 35, height = 19, units = "cm")
-  } else{
+  } else {
     ggsave(filePath, plot = p, width = 25, height = 19, units = "cm")
   }
 }
