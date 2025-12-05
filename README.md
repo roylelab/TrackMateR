@@ -37,6 +37,7 @@ needed) and analyse it.
 
 ``` r
 library(ggplot2)
+#> Warning: package 'ggplot2' was built under R version 4.5.2
 library(TrackMateR)
 # an example file is provided, otherwise use file.choose()
 xmlPath <- system.file("extdata", "ExampleTrackMateData.xml", package="TrackMateR")
@@ -44,7 +45,6 @@ xmlPath <- system.file("extdata", "ExampleTrackMateData.xml", package="TrackMate
 tmObj <- readTrackMateXML(XMLpath = xmlPath)
 #> Units are:  1 pixel and 0.07002736 s 
 #> Spatial units are in pixels - consider transforming to real units
-#> Collecting spot data. Using 20 cores
 #> Matching track data...
 #> Calculating distances...
 # Pixel size is actually 0.04 um and original data was 1 pixel, xyscalar = 0.04
