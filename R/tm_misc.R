@@ -1,7 +1,8 @@
 #' Setup Output Path
 #'
-#' In the working directory, we need to check if a path to a directory exists, and if not create it.
-#' Ensures smooth running of the automated functions in TestTrackMateR.
+#' In the working directory, we need to check if a path to a directory exists,
+#' and if not create it. Ensures smooth running of the automated functions in
+#' TestTrackMateR.
 #'
 #' @param fpath string containing a path that may or may not exist
 #' @return NULL
@@ -18,8 +19,8 @@ setupOutputPath <- function(fpath) {
 
 #' Merge Data Frames for export
 #'
-#' Properties for individual traces (tracks) from different experiments need to be merged for export.
-#' Utility function, not for export.
+#' Properties for individual traces (tracks) from different experiments need to
+#' be merged for export. Utility function, not for export.
 #'
 #' @param x data frame to be coerced
 #' @param y data frame to be coerced
@@ -31,8 +32,8 @@ mergeDataFramesForExport <- function(x, y) {
 
 #' Process additional parameters
 #'
-#' Ensure ellipsis parameters have the default values
-#' This function is used in two separate workflows, so a single function to edit makes sense.
+#' Ensure ellipsis parameters have the default values This function is used in
+#' two separate workflows, so a single function to edit makes sense.
 #'
 #' @param input list of ellipsis arguments
 #' @return list of arguments adjusted for defaults

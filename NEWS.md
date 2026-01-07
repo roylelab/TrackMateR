@@ -1,5 +1,9 @@
 # TrackMateR
 
+# TrackMateR 0.3.13
+
+- Added `compareDatasetValues()` to simply extract data from multiple datasets
+
 # TrackMateR 0.3.12
 
 - Moved from {XML} to {xml2} for reading TrackMate XML files. Future-proof but currently slower.

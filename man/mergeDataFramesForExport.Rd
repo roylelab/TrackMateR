@@ -12,7 +12,7 @@ mergeDataFramesForExport(x, y)
 \item{y}{data frame to be coerced}
 }
 \description{
-Properties for individual traces (tracks) from different experiments need to be merged for export.
-Utility function, not for export.
+Properties for individual traces (tracks) from different experiments need to
+be merged for export. Utility function, not for export.
 }
 \keyword{internal}

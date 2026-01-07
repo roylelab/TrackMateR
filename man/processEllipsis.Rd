@@ -13,7 +13,7 @@ processEllipsis(input)
 list of arguments adjusted for defaults
 }
 \description{
-Ensure ellipsis parameters have the default values
-This function is used in two separate workflows, so a single function to edit makes sense.
+Ensure ellipsis parameters have the default values This function is used in
+two separate workflows, so a single function to edit makes sense.
 }
 \keyword{internal}

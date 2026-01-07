@@ -35,7 +35,7 @@ In this scenario we would like to see:
 Start a new RStudio session in a new directory using Create Project.
 We find it useful to follow [this convention](https://martinctc.github.io/blog/rstudio-projects-and-working-directories-a-beginner's-guide/) for RStudio projects.
 This [gist](https://gist.github.com/quantixed/42625f988a7b5da25b7e333c4a660b97) can be run in the console to quickly set up the folder structure for your new project.
-Now place your data in a folder called `Data/` in this directory.
+Now place your data in the folder called `Data/` in your project directory.
 
 **Required**
 Place all your TrackMate XML files into subfolders according to condition.
@@ -61,6 +61,11 @@ library(TrackMateR)
 compareDatasets()
 ```
 
+If your TrackMate XML files are in a different location, you can specify the path to the data folder, e.g.
+```{r, eval = FALSE}
+compareDatasets(datadir = "path/to/your/Data/folder")
+```
+
 The outputs are generated using standard parameters equivalent to `reportDataset()`.
 However, it is possible to change the defaults by passing additional parameters.
 For example, `compareDatasets(radius = 100)` will use the defaults for everything except the radius for searching for neighbours in the track density analysis (this example will use a value of 100 units for the radius).
@@ -74,7 +79,7 @@ Parameters that can be changed are:
 
 ## Outputs
 
-In the example above, the code will produce the following in a directory called `Output/`
+In the example above, the code will produce the following in a directory called `Output/` (within your working directory)
 
 * Plots/
   + comparison.pdf
@@ -140,3 +145,10 @@ If the scaling is different between conditions:
 
 Note that if either spatial or temporal scaling is incorrect, most of the plots will be garbage.
 
+*If you are experiencing problems with recalibrating data, the best course of action is to ensure that the scaling of the original movies is correct and retrack them using TrackMate*
+
+## Quick extraction of data from muliple nested datasets
+
+If you simply want to extract data from multiple TrackMate XML files organised into condition subfolders, but do not need the full analysis and comparison, you can use `compareDatasetValues()`.
+This function will extract the data frames from each XML file, recalibrate if necessary, and save the data as a compiled dataframe (as a csv file) for each condition.
+Additionally, a per track and per movie summary is saved for all of the data.
