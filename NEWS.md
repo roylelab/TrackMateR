@@ -1,8 +1,12 @@
 # TrackMateR
 
+# TrackMateR 0.3.14
+
+- Improved speed in readTrackMateXML().
+
 # TrackMateR 0.3.13
 
-- Added `compareDatasetValues()` to simply extract data from multiple datasets
+- Added `compareDatasetValues()` to simply extract data from multiple datasets.
 
 # TrackMateR 0.3.12
 
